@@ -1,0 +1,235 @@
+The "exception has been thrown by target" error in UiPath's Invoke Code activity is often caused by null reference issues or type mismatches. Here's a more robust solution with proper error handling:
+
+## Method 1: Safe Invoke Code with Error Handling
+
+```vb.net
+Imports System.Data
+Imports System.Linq
+
+Try
+    Dim dt As New DataTable()
+    dt.Columns.Add("Item Names", GetType(String))
+    dt.Columns.Add("Reason", GetType(String))
+    dt.Columns.Add("StartTransactionTime", GetType(DateTime))
+    dt.Columns.Add("LastProcessingOn", GetType(DateTime))
+    dt.Columns.Add("Status", GetType(String))
+    dt.Columns.Add("Reference", GetType(String))
+
+    If ie_MainQueueItemList Is Nothing OrElse ie_MainQueueItemList.Count = 0 Then
+        outputDT = dt
+        Exit Sub
+    End If
+
+    For Each queueItem In ie_MainQueueItemList
+        Try
+            'Check if SpecificContent exists and contains Item Names
+            If queueItem.SpecificContent Is Nothing OrElse Not queueItem.SpecificContent.ContainsKey("Item Names") Then
+                Continue For
+            End If
+            
+            Dim itemNames As String = If(queueItem.SpecificContent("Item Names") IsNot Nothing, 
+                                       queueItem.SpecificContent("Item Names").ToString(), 
+                                       String.Empty)
+            
+            If String.IsNullOrEmpty(itemNames) Then
+                Continue For
+            End If
+            
+            Dim itemsArray As String() = itemNames.Split(","c)
+            
+            For Each item In itemsArray
+                If Not String.IsNullOrEmpty(item.Trim()) Then
+                    Dim reason As String = String.Empty
+                    
+                    'Safely get FinalTag from Output
+                    If queueItem.Output IsNot Nothing AndAlso queueItem.Output.ContainsKey("FinalTag") Then
+                        Dim finalTagObj As Object = queueItem.Output("FinalTag")
+                        If finalTagObj IsNot Nothing Then
+                            reason = finalTagObj.ToString().Replace("\", "").Replace("""", "").Trim()
+                        End If
+                    End If
+                    
+                    Dim newRow As DataRow = dt.NewRow()
+                    newRow("Item Names") = item.Trim()
+                    newRow("Reason") = reason
+                    
+                    'Safely handle DateTime properties
+                    If queueItem.StartTransactionTime IsNot Nothing Then
+                        newRow("StartTransactionTime") = queueItem.StartTransactionTime
+                    Else
+                        newRow("StartTransactionTime") = DBNull.Value
+                    End If
+                    
+                    If queueItem.LastProcessingOn IsNot Nothing Then
+                        newRow("LastProcessingOn") = queueItem.LastProcessingOn
+                    Else
+                        newRow("LastProcessingOn") = DBNull.Value
+                    End If
+                    
+                    'Safely handle Status and Reference
+                    newRow("Status") = If(queueItem.Status IsNot Nothing, queueItem.Status.ToString(), String.Empty)
+                    newRow("Reference") = If(queueItem.Reference IsNot Nothing, queueItem.Reference.ToString(), String.Empty)
+                    
+                    dt.Rows.Add(newRow)
+                End If
+            Next
+            
+        Catch ex As Exception
+            'Log error for this specific queue item but continue processing others
+            System.Diagnostics.Debug.WriteLine("Error processing queue item: " & ex.Message)
+        End Try
+    Next
+    
+    outputDT = dt
+    
+Catch ex As Exception
+    'Create empty datatable in case of major failure
+    Dim emptyDt As New DataTable()
+    emptyDt.Columns.Add("Item Names", GetType(String))
+    emptyDt.Columns.Add("Reason", GetType(String))
+    emptyDt.Columns.Add("StartTransactionTime", GetType(DateTime))
+    emptyDt.Columns.Add("LastProcessingOn", GetType(DateTime))
+    emptyDt.Columns.Add("Status", GetType(String))
+    emptyDt.Columns.Add("Reference", GetType(String))
+    outputDT = emptyDt
+    
+    Throw New Exception("Error in processing queue items: " & ex.Message)
+End Try
+```
+
+## Method 2: Step-by-Step UiPath Workflow (Recommended)
+
+Instead of using Invoke Code, use native UiPath activities:
+
+1. **Initialize DataTable** activity:
+   ```vb.net
+   New DataTable With {
+       .TableName = "ProcessedItems",
+       .Columns = {
+           New DataColumn("Item Names", GetType(String)),
+           New DataColumn("Reason", GetType(String)),
+           New DataColumn("StartTransactionTime", GetType(DateTime)),
+           New DataColumn("LastProcessingOn", GetType(DateTime)),
+           New DataColumn("Status", GetType(String)),
+           New DataColumn("Reference", GetType(String))
+       }
+   }
+   ```
+   *Output to: `dtResult`*
+
+2. **For Each** activity (Loop through `ie_MainQueueItemList`)
+   *Type argument: `YourQueueItemType`*
+
+3. **Inside For Each**:
+   - **If** activity (Check if SpecificContent exists):
+     ```vb.net
+     CurrentItem.SpecificContent IsNot Nothing AndAlso CurrentItem.SpecificContent.ContainsKey("Item Names")
+     ```
+   
+   - **Then** (Inside If):
+     - **Assign** activity:
+       ```vb.net
+       itemNamesStr = If(CurrentItem.SpecificContent("Item Names") IsNot Nothing, CurrentItem.SpecificContent("Item Names").ToString(), String.Empty)
+       ```
+     
+     - **Assign** activity:
+       ```vb.net
+       itemsArray = itemNamesStr.Split(","c).Where(Function(x) Not String.IsNullOrEmpty(x.Trim())).ToArray()
+       ```
+     
+     - **For Each** activity (Loop through `itemsArray`)
+       - **Assign** activity (Get reason):
+         ```vb.net
+         reasonStr = If(CurrentItem.Output IsNot Nothing AndAlso CurrentItem.Output.ContainsKey("FinalTag") AndAlso CurrentItem.Output("FinalTag") IsNot Nothing, 
+                       CurrentItem.Output("FinalTag").ToString().Replace("\", "").Replace("""", "").Trim(), 
+                       String.Empty)
+         ```
+       
+       - **Add Data Row** activity:
+         ```vb.net
+         New Object() {
+             currentItem.Trim(),
+             reasonStr,
+             If(CurrentItem.StartTransactionTime IsNot Nothing, CurrentItem.StartTransactionTime, Nothing),
+             If(CurrentItem.LastProcessingOn IsNot Nothing, CurrentItem.LastProcessingOn, Nothing),
+             If(CurrentItem.Status IsNot Nothing, CurrentItem.Status.ToString(), String.Empty),
+             If(CurrentItem.Reference IsNot Nothing, CurrentItem.Reference.ToString(), String.Empty)
+         }
+         ```
+         *DataTable: `dtResult`*
+
+## Method 3: Debugging Version with Logging
+
+```vb.net
+Imports System.Data
+
+Try
+    System.Diagnostics.Debug.WriteLine("Starting queue item processing...")
+    
+    Dim dt As New DataTable()
+    dt.Columns.Add("Item Names", GetType(String))
+    dt.Columns.Add("Reason", GetType(String))
+    dt.Columns.Add("StartTransactionTime", GetType(DateTime))
+    dt.Columns.Add("LastProcessingOn", GetType(DateTime))
+    dt.Columns.Add("Status", GetType(String))
+    dt.Columns.Add("Reference", GetType(String))
+
+    If ie_MainQueueItemList Is Nothing Then
+        System.Diagnostics.Debug.WriteLine("Queue item list is null")
+        outputDT = dt
+        Exit Sub
+    End If
+    
+    System.Diagnostics.Debug.WriteLine("Processing " + ie_MainQueueItemList.Count.ToString() + " queue items")
+
+    For i As Integer = 0 To ie_MainQueueItemList.Count - 1
+        Dim queueItem = ie_MainQueueItemList(i)
+        System.Diagnostics.Debug.WriteLine("Processing item " + i.ToString())
+        
+        Try
+            If queueItem.SpecificContent Is Nothing Then
+                System.Diagnostics.Debug.WriteLine("SpecificContent is null for item " + i.ToString())
+                Continue For
+            End If
+            
+            If Not queueItem.SpecificContent.ContainsKey("Item Names") Then
+                System.Diagnostics.Debug.WriteLine("Item Names key not found for item " + i.ToString())
+                Continue For
+            End If
+            
+            Dim itemNamesObj = queueItem.SpecificContent("Item Names")
+            If itemNamesObj Is Nothing Then
+                System.Diagnostics.Debug.WriteLine("Item Names value is null for item " + i.ToString())
+                Continue For
+            End If
+            
+            Dim itemNames As String = itemNamesObj.ToString()
+            If String.IsNullOrEmpty(itemNames) Then
+                Continue For
+            End If
+            
+            System.Diagnostics.Debug.WriteLine("Item Names found: " + itemNames)
+            
+            'Continue with the rest of the processing...
+
+        Catch ex As Exception
+            System.Diagnostics.Debug.WriteLine("Error in item " + i.ToString() + ": " + ex.Message)
+        End Try
+    Next
+    
+    outputDT = dt
+    
+Catch ex As Exception
+    System.Diagnostics.Debug.WriteLine("Global error: " + ex.ToString())
+    Throw
+End Try
+```
+
+**Key fixes applied:**
+1. Added null checks for all object references
+2. Used `Try-Catch` blocks for individual item processing
+3. Added proper error logging with `System.Diagnostics.Debug.WriteLine`
+4. Handled potential `DBNull` values for DateTime fields
+5. Added comprehensive null checking for all dictionary accesses
+
+Start with **Method 2** (step-by-step workflow) as it's more reliable in UiPath and easier to debug. The error was likely caused by null references that weren't being handled properly.
