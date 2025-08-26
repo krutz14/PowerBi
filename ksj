@@ -1,0 +1,17 @@
+SELECT
+    call_date,
+    total_calls,
+    success_count,
+    failure_count,
+    ROUND((success_count * 100.0 / total_calls), 2) as success_rate_percent,
+    ROUND(AVG(total_calls) OVER (), 2) as avg_daily_volume
+FROM (
+    SELECT
+        trunc(created) as call_date,
+        COUNT(*) as total_calls,
+        SUM(CASE WHEN LOWER(tag) LIKE '%ln_s%' THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN LOWER(tag) LIKE '%ln_f%' THEN 1 ELSE 0 END) as failure_count
+    FROM rpa_items
+    WHERE created >= TRUNC(SYSDATE) - 30
+    GROUP BY trunc(created)
+);
