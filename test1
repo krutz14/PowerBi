@@ -1,0 +1,75 @@
+I see the query structure you're working with. There are a few syntax issues to fix. Here's the corrected version:
+
+## Corrected MySQL Query
+
+```sql
+SELECT
+    DATE(created) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_s%' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_f%' THEN 1 ELSE 0 END) as failure_count,
+    ROUND(AVG(COUNT(*)) OVER (), 2) as avg_daily_volume
+FROM rpa_items
+WHERE created >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+GROUP BY DATE(created)
+ORDER BY DATE(created);
+```
+
+## Enhanced Version with Success Rate
+
+```sql
+SELECT
+    DATE(created) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_s%' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_f%' THEN 1 ELSE 0 END) as failure_count,
+    ROUND((SUM(CASE WHEN LOWER(tag) LIKE '%in_s%' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as success_rate_percent,
+    ROUND(AVG(COUNT(*)) OVER (), 2) as avg_daily_volume
+FROM rpa_items
+WHERE created >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+    AND created < CURDATE() -- Exclude today if data is incomplete
+GROUP BY DATE(created)
+ORDER BY call_date;
+```
+
+## For CSV Export
+
+```sql
+SELECT
+    DATE(created) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_s%' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN LOWER(tag) LIKE '%in_f%' THEN 1 ELSE 0 END) as failure_count,
+    ROUND((SUM(CASE WHEN LOWER(tag) LIKE '%in_s%' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as success_rate_percent
+FROM rpa_items
+WHERE created >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+    AND created < CURDATE()
+GROUP BY DATE(created)
+ORDER BY call_date
+INTO OUTFILE '/tmp/ln_api_analysis.csv'
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n';
+```
+
+## Key Fixes Made:
+
+1. **Removed `trunc()`** - MySQL uses `DATE()` instead of `trunc()` for date extraction
+2. **Added missing commas** between columns in SELECT clause
+3. **Used `LOWER()` function** instead of `lower()`
+4. **Added proper aliases** for readability
+5. **Added data validation** by excluding today's date if incomplete
+
+## If you want more specific pattern matching:
+
+```sql
+-- For exact pattern matching (if you know the exact tag format)
+SUM(CASE WHEN tag = 'IN_S' THEN 1 ELSE 0 END) as success_count,
+SUM(CASE WHEN tag = 'IN_F' THEN 1 ELSE 0 END) as failure_count
+
+-- For case-insensitive exact matching
+SUM(CASE WHEN UPPER(tag) = 'IN_S' THEN 1 ELSE 0 END) as success_count,
+SUM(CASE WHEN UPPER(tag) = 'IN_F' THEN 1 ELSE 0 END) as failure_count
+```
+
+This should give you the daily breakdown of API call volumes with success/failure counts as requested!
