@@ -1,0 +1,86 @@
+I'll help you create a MySQL query to analyze LN API call volumes, successes, and failures from the past 2 months. Here's how you can structure this:
+
+## Basic Query Structure
+
+```sql
+SELECT 
+    DATE(call_timestamp) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN status = 'failure' THEN 1 ELSE 0 END) as failure_count,
+    AVG(COUNT(*)) OVER () as avg_daily_volume
+FROM ln_api_calls
+WHERE call_timestamp >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+GROUP BY DATE(call_timestamp)
+ORDER BY call_date;
+```
+
+## More Detailed Analysis (Recommended)
+
+```sql
+SELECT 
+    DATE(call_timestamp) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN status = 'failure' THEN 1 ELSE 0 END) as failure_count,
+    ROUND((SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as success_rate_percent,
+    ROUND(AVG(COUNT(*)) OVER (), 2) as avg_daily_volume
+FROM ln_api_calls
+WHERE call_timestamp >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+    AND call_timestamp < CURDATE() -- Exclude today if incomplete
+GROUP BY DATE(call_timestamp)
+ORDER BY call_date;
+```
+
+## Export to CSV
+
+To get the CSV dump as requested:
+
+```sql
+SELECT 
+    DATE(call_timestamp) as call_date,
+    COUNT(*) as total_calls,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN status = 'failure' THEN 1 ELSE 0 END) as failure_count,
+    ROUND((SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2) as success_rate_percent
+FROM ln_api_calls
+WHERE call_timestamp >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+GROUP BY DATE(call_timestamp)
+ORDER BY call_date
+INTO OUTFILE '/tmp/ln_api_analysis.csv'
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n';
+```
+
+## Key Assumptions:
+
+1. **Table name**: `ln_api_calls` (adjust based on your actual table name)
+2. **Timestamp column**: `call_timestamp` (adjust if different)
+3. **Status column**: `status` with values 'success'/'failure' (adjust based on your schema)
+
+## If your schema differs:
+
+If your table structure is different, you might need to modify:
+
+```sql
+-- If status is stored as boolean (1/0)
+SUM(status) as success_count,
+SUM(1 - status) as failure_count
+
+-- If you have error codes instead of status
+SUM(CASE WHEN error_code = 0 THEN 1 ELSE 0 END) as success_count,
+SUM(CASE WHEN error_code != 0 THEN 1 ELSE 0 END) as failure_count
+
+-- If you have a different timestamp column name
+WHERE created_at >= DATE_SUB(NOW(), INTERVAL 2 MONTH)
+```
+
+## To run this:
+
+1. Connect to your PROD MySQL database
+2. Adjust the table and column names to match your schema
+3. Execute the query
+4. The CSV will be created at the specified path (you may need file permissions)
+
+Would you like me to help you modify this query based on your specific database schema?
