@@ -1,0 +1,117 @@
+Perfect 🙌 — let’s set it up so you can run the **Python (pandas) script inside UiPath** and replace the Execute Query / DataTable logic entirely.
+
+---
+
+## 🔹 Steps: Run Python with UiPath
+
+### 1. Install Requirements
+
+* Install **Python 3.8+** on your machine.
+* Install `pandas` and `openpyxl` (for Excel):
+
+```bash
+pip install pandas openpyxl
+```
+
+---
+
+### 2. Prepare the Python Script
+
+Save this as `process_claims.py`:
+
+```python
+import pandas as pd
+import sys
+
+# --- Read arguments from UiPath ---
+input_file = sys.argv[1]   # Excel input file path
+sheet_name = sys.argv[2]   # Sheet name
+process_id = sys.argv[3]
+created_by = sys.argv[4]
+
+# 1. Read Excel
+df = pd.read_excel(input_file, sheet_name=sheet_name)
+
+# 2. Filter (WHERE CLAIM_NB IS NOT NULL)
+df = df[df["CLAIM_NB"].notna()]
+
+# 3. Create STORE column
+df["STORE"] = (
+    "CLAIM_AGE: " + df["CLAIM_AGE"].astype(str) + "; " +
+    "CLAIM_NB: " + df["CLAIM_NB"].astype(str) + "; " +
+    "CLAIM_TP: " + df["CLAIM_TP"].astype(str) + "; " +
+    "CLM_SCENARIO: " + df["CLM_SCENARIO"].astype(str) + "; " +
+    "REPORTED_DT: " + df["REPORTED_DT"].astype(str) + "; " +
+    "TRANSACTION_DT_TM: " + df["TRANSACTION_DT_TM"].astype(str) + "; " +
+    "CLAIM_AM: " + df["CLAIM_AM"].astype(str) + "; " +
+    "DOLLAR_AM: " + df["DOLLAR_AM"].astype(str) + "; " +
+    "ACCOUNT_NB: " + df["ACCOUNT_NB"].astype(str) + "; " +
+    "TRAN_DESC: " + df["TRAN_DESC"].astype(str) + "; " +
+    "IND_NON_IND: " + df["IND_NON_IND"].astype(str) + "; " +
+    "BANK_NB: " + df["BANK_NB"].astype(str)
+)
+
+# 4. Add extra columns
+df["In_ProcessId"] = process_id
+df["InCreatedBy"] = created_by
+df["PendingStatus"] = "Pending"
+
+# 5. Reorder columns
+final_cols = ["In_ProcessId", "Item_Name", "InCreatedBy", "PendingStatus", "STORE"]
+df_final = df[final_cols]
+
+# 6. Save to Excel (UiPath can pick it later)
+output_file = "output.xlsx"
+df_final.to_excel(output_file, index=False)
+
+print(output_file)  # UiPath will read this path
+```
+
+---
+
+### 3. UiPath Workflow Setup
+
+1. **Drag `Python Scope` activity**
+
+   * Set Python Path: e.g. `C:\Users\You\AppData\Local\Programs\Python\Python38\python.exe`
+
+2. **Inside Python Scope → Use `Load Python Script`**
+
+   * Path: `process_claims.py`
+   * Output: `pyScript`
+
+3. **Invoke Python Method**
+
+   * Method Name: `main` (or leave blank since we’re calling whole script)
+   * Pass Arguments:
+
+     * Excel input file path
+     * Sheet name (`"Sheet1"`)
+     * `In_ProcessId`
+     * `InCreatedBy`
+   * Output: `result` (string → should be `"output.xlsx"`)
+
+4. **Read Range (Excel Application Scope)**
+
+   * Path: `result.ToString`
+   * Store into a DataTable `dtFinal`
+
+---
+
+### 4. Now `dtFinal` in UiPath = Your Final Query Result 🎉
+
+* All concatenations (STORE column) done in Python.
+* Extra fields (`In_ProcessId`, `InCreatedBy`, `PendingStatus`) added.
+* You can continue in UiPath with `dtFinal` (write DB, send email, etc.).
+
+---
+
+⚡ This way:
+
+* Excel → Python → UiPath DataTable
+* No SQL queries, no Execute Query, no slow DataTable loops.
+* Fully optimized with pandas.
+
+---
+
+👉 Do you want me to also show you a **LINQ version inside UiPath (no Python)** so you can compare readability vs Python?
