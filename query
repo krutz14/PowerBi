@@ -1,0 +1,27 @@
+SELECT 
+    claims.unique_value,
+    COUNT(*) as transaction_count
+FROM (
+    SELECT DISTINCT
+        SUBSTR(
+            item_name,
+            INSTR(item_name, '_', 1, 1) + 1,
+            INSTR(item_name, '_', 1, 2) - INSTR(item_name, '_', 1, 1) - 1
+        ) AS unique_value
+    FROM rpa_items
+    WHERE status_flag IN (0)
+       AND process_id = 444
+       AND item_name LIKE '%092320255'
+) AS claims
+JOIN rpa_items ON (
+    SUBSTR(
+        rpa_items.item_name,
+        INSTR(rpa_items.item_name, '_', 1, 1) + 1,
+        INSTR(rpa_items.item_name, '_', 1, 2) - INSTR(rpa_items.item_name, '_', 1, 1) - 1
+    ) = claims.unique_value
+    AND rpa_items.status_flag IN (0)
+    AND rpa_items.process_id = 444
+    AND rpa_items.item_name LIKE '%092320255'
+)
+GROUP BY claims.unique_value
+ORDER BY transaction_count DESC;
