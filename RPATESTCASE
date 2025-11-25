@@ -1,0 +1,161 @@
+Here’s one unique but very **doable** idea you can actually build in the GPT builder right now.
+
+---
+
+## 1. Agent Name / GPT
+
+**Name:**
+**BotTest Buddy – RPA Test Case Generator**
+
+---
+
+## 2. Purpose / Description (for your email / form)
+
+> **BotTest Buddy** helps RPA developers quickly create structured test cases, test data sets, and UAT checklists for UiPath automations.
+>
+> Users can paste a process description, PDD snippet, or Studio/StudioX workflow summary, and the GPT generates:
+>
+> * Happy-path, negative and boundary test scenarios
+> * Step-by-step test cases in tabular form
+> * Suggested test data combinations
+> * Edge cases and exception scenarios to validate bot robustness
+
+This reduces manual effort in writing test cases and helps standardise QA across all RPA projects.
+
+---
+
+## 3. What this GPT will actually do (day-to-day)
+
+For any new or existing bot, the user can:
+
+1. **Paste a brief description / PDD section**
+
+   * e.g. “Bot reads invoices from email, validates vendor ID, posts to SAP, and sends summary email.”
+
+2. **BotTest Buddy outputs:**
+
+   * 10–20 **test scenarios**, grouped as:
+
+     * Happy path
+     * Business rule failures
+     * System failures (app not available, timeout)
+     * Data edge cases (nulls, long values, duplicates, special characters)
+
+   * A **test case table**, for example:
+
+     | ID | Scenario Type | Pre-conditions | Steps | Expected Result |
+     | -- | ------------- | -------------- | ----- | --------------- |
+
+   * A **test data matrix**, e.g.:
+
+     | Field | Valid Values | Invalid Values | Boundary Values |
+
+   * A **UAT checklist**:
+
+     * items for business UAT
+     * logging & audit checks
+     * exception handling checks
+     * performance checks (e.g. volume, peak load)
+
+3. Optional: user uploads an **Excel test-case template**, and BotTest Buddy fills content in the correct column structure (user copies it back into their template).
+
+---
+
+## 4. How to implement this in the GPT Builder
+
+You don’t need any complex actions or APIs for version 1. Just instructions + (optionally) a few reference documents.
+
+### 4.1. System Instructions (paste into “Instructions”)
+
+You can adapt this as needed:
+
+> You are **BotTest Buddy**, an expert QA engineer for RPA projects built in UiPath Studio and StudioX.
+>
+> Your job is to turn any RPA process description, PDD excerpt, or workflow summary into:
+>
+> 1. A list of clear test scenarios (happy path, negative cases, boundary/edge cases, system failure cases).
+> 2. Detailed test cases in tabular form with columns: Test Case ID, Scenario Type, Objective, Pre-conditions, Test Steps, Expected Result, Priority.
+> 3. A test data matrix with columns: Field, Valid Values, Invalid Values, Boundary Values, Special Cases.
+> 4. A short UAT checklist with items for business users to validate the bot in real-world conditions.
+>
+> Guidelines:
+>
+> * Assume the automation is built in UiPath unless told otherwise.
+> * Always ask a **maximum of 2–3 clarifying questions** only if critical information is missing (e.g. main applications, input source, output format).
+> * Use concise, professional English.
+> * Use markdown tables.
+> * For every process, generate at least:
+>
+>   * 3–5 happy-path scenarios
+>   * 5–10 negative/exception scenarios
+>   * 3–5 boundary/edge scenarios
+> * Where relevant, include tests for:
+>
+>   * application availability
+>   * network issues / timeouts
+>   * invalid or missing input data
+>   * duplicate records
+>   * incorrect file formats
+>   * incorrect credentials or access issues.
+> * If the user uploads an Excel/CSV with specific column headers, align the test case columns and mention clearly which columns you filled conceptually (even though you can’t edit the sheet directly).
+
+### 4.2. Knowledge to Upload (optional but makes it “smart”)
+
+Upload a few internal or generic documents as “Knowledge”:
+
+* Your **standard RPA test-case template** (Excel or Word).
+* A sample **PDD + its final test cases** (so the GPT sees your style).
+* Any internal **RPA testing guidelines / checklists**.
+
+Tell the GPT in the instructions:
+
+> “Follow the style and level of detail of the uploaded test-case templates and checklists.”
+
+### 4.3. Tools / Actions
+
+For a simple, feasible version:
+
+* **No actions required** (no need to connect UiPath APIs etc.).
+* Rely on:
+
+  * File upload (PDDs, templates)
+  * Plain text descriptions from developers / BAs.
+
+You can add actions later (e.g. log cases into a SharePoint list or Azure DevOps), but not needed for your submission.
+
+### 4.4. Suggested conversation starters (for the GPT UI)
+
+Add a few:
+
+* “Generate test cases for a bot that processes vendor invoices from Outlook and posts them into SAP.”
+* “Here is a PDD section. Create detailed test cases and a test data matrix.”
+* “Suggest negative and boundary test scenarios for a bot that updates employee records from Excel to an HR system.”
+* “Create a UAT checklist for this automation and highlight high-risk scenarios.”
+
+---
+
+## 5. Simple example usage (you can show this in your submission)
+
+**User:**
+“I have a bot that reads Excel with employee details, validates mandatory fields, creates new employees in the HR portal, and sends a summary email. Please create test scenarios, test cases and test data.”
+
+**BotTest Buddy (high level):**
+
+* Lists happy path scenarios:
+
+  * Valid file, all records OK…
+* Negative scenarios:
+
+  * Missing mandatory fields, duplicate employee IDs, invalid email formats, HR portal down, etc.
+* Provides:
+
+  * Test case table (5–10 sample rows)
+  * Test data matrix for fields like Employee ID, Email, Date of Joining, etc.
+  * UAT checklist (business validation, email content, audit logs, etc.)
+
+---
+
+If you want, I can also:
+
+* Write a **one-slide summary** for your team deck, or
+* Draft the **exact text** you’ll paste into the “Description” and “Capabilities” sections in the Create-a-GPT screen.
